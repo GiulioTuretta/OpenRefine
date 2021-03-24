@@ -337,9 +337,8 @@ public class StandardReconConfigTests extends RefineTest {
         try (MockWebServer server = new MockWebServer()) {
             server.start();
             HttpUrl url = server.url("/openrefine-wikidata/en/api");
-            // FIXME: Retry doesn't currently work, but should be tested
-//            server.enqueue(new MockResponse().setResponseCode(503)); // service overloaded
-            server.enqueue(new MockResponse().setBody(reconResponse));
+            server.enqueue(new MockResponse().setResponseCode(503)); // service initially overloaded
+            server.enqueue(new MockResponse().setBody(reconResponse)); // service returns successfully
             server.enqueue(new MockResponse());
 
             String configJson = " {\n" +

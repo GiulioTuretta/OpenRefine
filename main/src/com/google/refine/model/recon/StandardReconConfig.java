@@ -463,10 +463,33 @@ public class StandardReconConfig extends ReconConfig {
         stringWriter.write("}");
         String queriesString = stringWriter.toString();
         
-        try {
-            String responseString = postQueries(service, queriesString);
-            ObjectNode o = ParsingUtilities.evaluateJsonStringToObjectNode(responseString);
+        // We implement our own exponential retry because our HTTP client
+        // does not retry POST requests by itself
+        int retries = 0;
+        int maxRetries = 4;
+        int sleepTime = 1000;
+        String responseString = null;
+        while (responseString == null && retries < maxRetries) {
+            try {
+                responseString = postQueries(service, queriesString);
+            } catch (IOException e) {
+                retries++;
+                if (retries < maxRetries) {
+                    logger.warn("Retrying recon queries:\n" + queriesString, e);
+                    try {
+                        Thread.sleep(sleepTime);
+                    } catch (InterruptedException e1) {
+                        break;
+                    }
+                    sleepTime *= 2;
+                } else {
+                    logger.error("Giving up on recon queries:\n" + queriesString, e);
+                }
+            }
+        }
 
+        if (responseString != null) {
+            ObjectNode o = ParsingUtilities.evaluateJsonStringToObjectNode(responseString);
             if (o == null) { // utility method returns null instead of throwing
                 logger.error("Failed to parse string as JSON: " + responseString);
             } else {
@@ -497,8 +520,6 @@ public class StandardReconConfig extends ReconConfig {
                     recons.add(recon);
                 }
             }
-        } catch (IOException e) {
-            logger.error("Failed to batch recon with load:\n" + queriesString, e);
         }
 
         // TODO: This code prevents the retry mechanism in ReconOperation from working
